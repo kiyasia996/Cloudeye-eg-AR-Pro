@@ -7,7 +7,6 @@
     <title>AR Logo Viewer - iOS Compatible</title>
     <!-- Load the latest A-Frame and AR.js versions -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
-    <!-- Using the latest AR.js version with better iOS support -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ar.js/3.4.5/aframe-ar-nft.min.js"></script>
     <style>
       body {
@@ -111,6 +110,18 @@
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
+      #debug-info {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px;
+        font-size: 12px;
+        z-index: 1000;
+        max-width: 80%;
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -127,15 +138,21 @@
       Point your camera at a flat surface and tap to place your 3D logo
     </div>
 
+    <div id="debug-info"></div>
+
     <!-- A-Frame Scene - Initially hidden -->
     <a-scene 
       id="scene"
       class="hidden"
       embedded
-      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; trackingMethod: best; sourceWidth: 1280; sourceHeight: 960;"
+      arjs="sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best; sourceWidth: 1280; sourceHeight: 960; debugUIEnabled: false;"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
-      renderer="antialias: true; alpha: true; precision: mediump;">
+      renderer="logarithmicDepthBuffer: true; antialias: true; alpha: true; precision: mediump;">
+      
+      <a-assets>
+        <a-asset-item id="logo-model" src="./CloudEyeVERSE-LOGO-V3.glb"></a-asset-item>
+      </a-assets>
       
       <!-- Camera with gesture control -->
       <a-entity camera position="0 1.6 0" look-controls="touchEnabled: false"></a-entity>
@@ -177,6 +194,7 @@
         const rotateRightBtn = document.getElementById('rotateRight');
         const scaleUpBtn = document.getElementById('scaleUp');
         const scaleDownBtn = document.getElementById('scaleDown');
+        const debugInfo = document.getElementById('debug-info');
         
         // State variables
         let isPlaced = false;
@@ -184,9 +202,24 @@
         let currentScale = 1;
         let modelLoaded = false;
 
+        // Enable debug mode during development
+        const debug = false;
+        if (debug) {
+          debugInfo.style.display = 'block';
+        }
+
+        function logDebug(message) {
+          if (debug) {
+            debugInfo.innerHTML += message + '<br>';
+            console.log(message);
+          }
+        }
+
         // Hide loading when everything is ready
         window.addEventListener('load', function() {
-          loadingScreen.classList.add('hidden');
+          setTimeout(() => {
+            loadingScreen.classList.add('hidden');
+          }, 1000); // Give it a second to ensure everything is loaded
         });
         
         // Start AR experience
@@ -203,27 +236,42 @@
 
         // Function to load the 3D model
         function loadModel() {
-          // Create the entity for the model
-          const logoModel = document.createElement('a-entity');
-          logoModel.setAttribute('gltf-model', 'CloudEyeVERSE-LOGO-V3.glb'); // Replace with your actual model filename
-          logoModel.setAttribute('position', '0 0 0');
-          logoModel.setAttribute('rotation', '0 0 0');
-          logoModel.setAttribute('scale', '1 1 1');
-          
-          // Add the model to the scene
-          placedLogo.appendChild(logoModel);
-          modelLoaded = true;
-          
-          // Add event listener for model loading errors
-          logoModel.addEventListener('model-error', function(e) {
-            console.error('Error loading model:', e.detail);
-            alert('Error loading 3D model. Please check the file path and try again.');
-          });
+          try {
+            logDebug('Loading model...');
+            
+            // Create the entity for the model
+            const logoModel = document.createElement('a-entity');
+            
+            // Use the asset item with error handling
+            logoModel.setAttribute('gltf-model', '#logo-model');
+            logoModel.setAttribute('position', '0 0 0');
+            logoModel.setAttribute('rotation', '0 0 0');
+            logoModel.setAttribute('scale', '1 1 1');
+            
+            // Add the model to the scene
+            placedLogo.appendChild(logoModel);
+            modelLoaded = true;
+            
+            // Add event listener for model loading
+            logoModel.addEventListener('model-loaded', function() {
+              logDebug('Model loaded successfully!');
+            });
+            
+            // Add event listener for model loading errors
+            logoModel.addEventListener('model-error', function(e) {
+              const errorMessage = 'Error loading model: ' + (e.detail.message || 'Unknown error');
+              logDebug(errorMessage);
+              alert('Error loading 3D model. Please check the file path and try again.');
+            });
+          } catch (error) {
+            logDebug('Error in loadModel: ' + error.message);
+          }
         }
         
         // Handle tap to place
         scene.addEventListener('click', function(event) {
           if (!isPlaced) {
+            logDebug('Placing model...');
             placedModelWrapper.setAttribute('visible', true);
             controls.classList.remove('hidden');
             instructions.classList.add('hidden');
