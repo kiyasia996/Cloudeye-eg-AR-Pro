@@ -4,16 +4,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>AR Logo Viewer - iOS Compatible</title>
-    <!-- Load the latest A-Frame and AR.js versions -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ar.js/3.4.5/aframe-ar-nft.min.js"></script>
+    <title>Simple AR Logo Viewer - iOS Fixed</title>
+    <!-- Use specific versions known to work well on iOS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.3.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.3.1/aframe/build/aframe-ar.js"></script>
     <style>
       body {
         margin: 0;
         overflow: hidden;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        -webkit-tap-highlight-color: transparent;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       }
       .ui-container {
         position: fixed;
@@ -21,7 +20,6 @@
         width: 100%;
         display: flex;
         justify-content: center;
-        pointer-events: none;
         z-index: 10;
       }
       .controls {
@@ -30,47 +28,40 @@
         border-radius: 30px;
         display: flex;
         gap: 15px;
-        pointer-events: auto;
       }
       .btn {
         background: white;
         border: none;
         border-radius: 50%;
-        width: 60px;
-        height: 60px;
+        width: 50px;
+        height: 50px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 24px;
+        font-size: 20px;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-        -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        user-select: none;
       }
       .btn:active {
         background: #f1f1f1;
         transform: scale(0.95);
       }
-      .instructions {
+      .hidden {
+        display: none;
+      }
+      .start-screen {
         position: fixed;
-        top: 40px;
+        top: 0;
         left: 0;
-        right: 0;
-        background: rgba(0, 0, 0, 0.7);
-        color: white;
-        padding: 15px;
-        text-align: center;
-        z-index: 10;
-        transition: opacity 0.5s;
-        font-weight: 500;
-        border-radius: 10px;
-        margin: 0 20px;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 999;
       }
       .start-button {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
         background: #007AFF;
         color: white;
         font-size: 18px;
@@ -78,254 +69,192 @@
         padding: 16px 30px;
         border-radius: 30px;
         border: none;
-        z-index: 100;
+        margin-top: 20px;
       }
-      .hidden {
-        display: none;
+      .status-text {
+        color: white;
+        margin-top: 20px;
+        text-align: center;
+        padding: 0 20px;
       }
-      .loading {
+      #model-status {
         position: fixed;
-        top: 0;
+        bottom: 120px;
         left: 0;
         width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
+        text-align: center;
         color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        z-index: 1000;
-      }
-      .spinner {
-        width: 50px;
-        height: 50px;
-        border: 5px solid #f3f3f3;
-        border-top: 5px solid #007AFF;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-bottom: 20px;
-      }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      #debug-info {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        background: rgba(0, 0, 0, 0.7);
-        color: white;
-        padding: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 5px;
         font-size: 12px;
-        z-index: 1000;
-        max-width: 80%;
-        display: none;
+        z-index: 100;
       }
     </style>
   </head>
   <body>
-    <div id="loading" class="loading">
-      <div class="spinner"></div>
-      <p>Loading AR Experience...</p>
+    <div id="start-screen" class="start-screen">
+      <h2 style="color: white;">AR Logo Viewer</h2>
+      <p class="status-text">Experience your 3D logo in augmented reality</p>
+      <button id="start-button" class="start-button">Start AR Experience</button>
+      <p id="loading-status" class="status-text">Initializing...</p>
     </div>
 
-    <button id="start-button" class="start-button">
-      Tap to Start AR
-    </button>
+    <div id="model-status" class="hidden">Model Status: Loading...</div>
 
-    <div id="instructions" class="instructions hidden">
-      Point your camera at a flat surface and tap to place your 3D logo
-    </div>
-
-    <div id="debug-info"></div>
-
-    <!-- A-Frame Scene - Initially hidden -->
+    <!-- A-Frame Scene -->
     <a-scene 
-      id="scene"
-      class="hidden"
       embedded
-      arjs="sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best; sourceWidth: 1280; sourceHeight: 960; debugUIEnabled: false;"
+      arjs="sourceType: webcam; debugUIEnabled: false;"
       vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: false"
-      renderer="logarithmicDepthBuffer: true; antialias: true; alpha: true; precision: mediump;">
+      renderer="logarithmicDepthBuffer: true;"
+      id="ar-scene"
+      class="hidden">
       
-      <a-assets>
-        <a-asset-item id="logo-model" src="./CloudEyeVERSE-LOGO-V3.glb"></a-asset-item>
-      </a-assets>
-      
-      <!-- Camera with gesture control -->
-      <a-entity camera position="0 1.6 0" look-controls="touchEnabled: false"></a-entity>
-      
-      <!-- Location for placing the 3D model -->
-      <a-entity
-        id="placed-model-wrapper"
-        visible="false"
-        position="0 0 -2">
-        <a-entity
-          id="placed-logo"
-          rotation="0 0 0"
-          scale="1 1 1">
-          <!-- This will be set in JavaScript -->
-        </a-entity>
+      <!-- Camera with cursor for interaction -->
+      <a-entity camera position="0 1.6 0" look-controls="enabled: false">
+        <a-entity cursor="fuse: false;" raycaster="objects: .clickable;"></a-entity>
       </a-entity>
+      
+      <!-- Container for the model -->
+      <a-entity id="model-container" position="0 0 -3" class="clickable" visible="false"></a-entity>
     </a-scene>
 
     <div class="ui-container">
       <div id="controls" class="controls hidden">
-        <button id="rotateLeft" class="btn">↺</button>
-        <button id="scaleDown" class="btn">-</button>
-        <button id="scaleUp" class="btn">+</button>
-        <button id="rotateRight" class="btn">↻</button>
+        <button id="rotate-left" class="btn">↺</button>
+        <button id="scale-down" class="btn">-</button>
+        <button id="scale-up" class="btn">+</button>
+        <button id="rotate-right" class="btn">↻</button>
       </div>
     </div>
 
     <script>
-      document.addEventListener('DOMContentLoaded', function() {
+      window.addEventListener('DOMContentLoaded', () => {
         // Elements
+        const startScreen = document.getElementById('start-screen');
         const startButton = document.getElementById('start-button');
-        const loadingScreen = document.getElementById('loading');
-        const scene = document.getElementById('scene');
-        const instructions = document.getElementById('instructions');
+        const loadingStatus = document.getElementById('loading-status');
+        const arScene = document.getElementById('ar-scene');
+        const modelContainer = document.getElementById('model-container'); 
         const controls = document.getElementById('controls');
-        const placedModelWrapper = document.getElementById('placed-model-wrapper');
-        const placedLogo = document.getElementById('placed-logo');
-        const rotateLeftBtn = document.getElementById('rotateLeft');
-        const rotateRightBtn = document.getElementById('rotateRight');
-        const scaleUpBtn = document.getElementById('scaleUp');
-        const scaleDownBtn = document.getElementById('scaleDown');
-        const debugInfo = document.getElementById('debug-info');
+        const modelStatus = document.getElementById('model-status');
+        
+        // Control buttons
+        const rotateLeft = document.getElementById('rotate-left');
+        const rotateRight = document.getElementById('rotate-right');
+        const scaleUp = document.getElementById('scale-up');
+        const scaleDown = document.getElementById('scale-down');
         
         // State variables
-        let isPlaced = false;
+        let isModelPlaced = false;
         let currentRotation = 0;
         let currentScale = 1;
-        let modelLoaded = false;
-
-        // Enable debug mode during development
-        const debug = false;
-        if (debug) {
-          debugInfo.style.display = 'block';
-        }
-
-        function logDebug(message) {
-          if (debug) {
-            debugInfo.innerHTML += message + '<br>';
-            console.log(message);
-          }
-        }
-
-        // Hide loading when everything is ready
-        window.addEventListener('load', function() {
-          setTimeout(() => {
-            loadingScreen.classList.add('hidden');
-          }, 1000); // Give it a second to ensure everything is loaded
-        });
         
-        // Start AR experience
-        startButton.addEventListener('click', function() {
-          startButton.classList.add('hidden');
-          scene.classList.remove('hidden');
-          instructions.classList.remove('hidden');
+        // Check for iOS
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        
+        // Start button click handler
+        startButton.addEventListener('click', () => {
+          loadingStatus.textContent = "Loading AR experience...";
+          startButton.style.display = 'none';
           
-          // Create and add the 3D model element
-          if (!modelLoaded) {
-            loadModel();
-          }
+          // Show the AR scene
+          arScene.classList.remove('hidden');
+          
+          setTimeout(() => {
+            try {
+              // Load model after a short delay
+              loadModel();
+              loadingStatus.textContent = "AR ready! Looking for surfaces...";
+              
+              // Hide start screen after a short delay
+              setTimeout(() => {
+                startScreen.style.display = 'none';
+                modelStatus.classList.remove('hidden');
+              }, 1000);
+            } catch (error) {
+              loadingStatus.textContent = "Error: " + error.message;
+              console.error("AR initialization error:", error);
+            }
+          }, 500);
         });
-
-        // Function to load the 3D model
+        
+        // Handle model loading
         function loadModel() {
-          try {
-            logDebug('Loading model...');
+          modelStatus.textContent = "Model Status: Loading model...";
+          
+          // Create new entity for the model
+          const modelEntity = document.createElement('a-entity');
+          modelEntity.setAttribute('id', 'logo-model');
+          modelEntity.setAttribute('position', '0 0 0');
+          modelEntity.setAttribute('rotation', '0 0 0');
+          modelEntity.setAttribute('scale', '1 1 1');
+          
+          // Use direct path to model - adjust this path to your actual file location
+          // Make sure the file is in the root of your GitHub Pages repo
+          modelEntity.setAttribute('gltf-model', 'logo.glb');
+          
+          // Add model to container
+          modelContainer.appendChild(modelEntity);
+          
+          // Listen for model loaded event
+          modelEntity.addEventListener('model-loaded', () => {
+            modelStatus.textContent = "Model Status: Loaded! Tap to place.";
+            console.log("Model loaded successfully");
             
-            // Create the entity for the model
-            const logoModel = document.createElement('a-entity');
+            // Make model container visible
+            modelContainer.setAttribute('visible', true);
             
-            // Use the asset item with error handling
-            logoModel.setAttribute('gltf-model', '#logo-model');
-            logoModel.setAttribute('position', '0 0 0');
-            logoModel.setAttribute('rotation', '0 0 0');
-            logoModel.setAttribute('scale', '1 1 1');
-            
-            // Add the model to the scene
-            placedLogo.appendChild(logoModel);
-            modelLoaded = true;
-            
-            // Add event listener for model loading
-            logoModel.addEventListener('model-loaded', function() {
-              logDebug('Model loaded successfully!');
-            });
-            
-            // Add event listener for model loading errors
-            logoModel.addEventListener('model-error', function(e) {
-              const errorMessage = 'Error loading model: ' + (e.detail.message || 'Unknown error');
-              logDebug(errorMessage);
-              alert('Error loading 3D model. Please check the file path and try again.');
-            });
-          } catch (error) {
-            logDebug('Error in loadModel: ' + error.message);
-          }
+            // Set up tap handler for placement
+            setupTapHandler();
+          });
+          
+          // Listen for model error event
+          modelEntity.addEventListener('model-error', (error) => {
+            modelStatus.textContent = "Model Status: Error loading model!";
+            console.error("Error loading model:", error);
+          });
         }
         
-        // Handle tap to place
-        scene.addEventListener('click', function(event) {
-          if (!isPlaced) {
-            logDebug('Placing model...');
-            placedModelWrapper.setAttribute('visible', true);
-            controls.classList.remove('hidden');
-            instructions.classList.add('hidden');
-            isPlaced = true;
-          }
-        });
+        // Set up tap handler for model placement
+        function setupTapHandler() {
+          // Use touch for mobile, click for desktop
+          const eventType = 'ontouchstart' in window ? 'touchend' : 'click';
+          
+          document.body.addEventListener(eventType, (event) => {
+            if (!isModelPlaced) {
+              modelStatus.textContent = "Model placed! Use controls to adjust.";
+              controls.classList.remove('hidden');
+              isModelPlaced = true;
+              
+              // Hide status after a few seconds
+              setTimeout(() => {
+                modelStatus.classList.add('hidden');
+              }, 3000);
+            }
+          }, { once: false });
+        }
         
-        // Handle rotation and scaling with touch-optimized code
-        rotateLeftBtn.addEventListener('touchstart', function(e) {
-          e.preventDefault();
+        // Control handlers
+        rotateLeft.addEventListener('click', () => {
           currentRotation -= 15;
-          placedLogo.setAttribute('rotation', `0 ${currentRotation} 0`);
+          document.getElementById('logo-model').setAttribute('rotation', `0 ${currentRotation} 0`);
         });
         
-        rotateRightBtn.addEventListener('touchstart', function(e) {
-          e.preventDefault();
+        rotateRight.addEventListener('click', () => {
           currentRotation += 15;
-          placedLogo.setAttribute('rotation', `0 ${currentRotation} 0`);
+          document.getElementById('logo-model').setAttribute('rotation', `0 ${currentRotation} 0`);
         });
         
-        scaleUpBtn.addEventListener('touchstart', function(e) {
-          e.preventDefault();
+        scaleUp.addEventListener('click', () => {
           currentScale += 0.1;
-          placedLogo.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+          document.getElementById('logo-model').setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
         });
         
-        scaleDownBtn.addEventListener('touchstart', function(e) {
-          e.preventDefault();
+        scaleDown.addEventListener('click', () => {
           if (currentScale > 0.2) {
             currentScale -= 0.1;
-            placedLogo.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
-          }
-        });
-        
-        // Also handle normal clicks for testing on desktop
-        rotateLeftBtn.addEventListener('click', function() {
-          currentRotation -= 15;
-          placedLogo.setAttribute('rotation', `0 ${currentRotation} 0`);
-        });
-        
-        rotateRightBtn.addEventListener('click', function() {
-          currentRotation += 15;
-          placedLogo.setAttribute('rotation', `0 ${currentRotation} 0`);
-        });
-        
-        scaleUpBtn.addEventListener('click', function() {
-          currentScale += 0.1;
-          placedLogo.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
-        });
-        
-        scaleDownBtn.addEventListener('click', function() {
-          if (currentScale > 0.2) {
-            currentScale -= 0.1;
-            placedLogo.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+            document.getElementById('logo-model').setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
           }
         });
       });
