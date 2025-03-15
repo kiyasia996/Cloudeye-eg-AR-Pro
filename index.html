@@ -3,18 +3,22 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Logo Viewer</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>AR Logo Viewer - iOS Compatible</title>
+    <!-- Load the latest A-Frame and AR.js versions -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ar.js/2.4.0/aframe-ar.min.js"></script>
+    <!-- Using the latest AR.js version with better iOS support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ar.js/3.4.5/aframe-ar-nft.min.js"></script>
     <style>
       body {
         margin: 0;
         overflow: hidden;
-        font-family: Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        -webkit-tap-highlight-color: transparent;
       }
       .ui-container {
         position: fixed;
-        bottom: 20px;
+        bottom: 40px;
         width: 100%;
         display: flex;
         justify-content: center;
@@ -24,7 +28,7 @@
       .controls {
         background: rgba(0, 0, 0, 0.5);
         padding: 10px 20px;
-        border-radius: 20px;
+        border-radius: 30px;
         display: flex;
         gap: 15px;
         pointer-events: auto;
@@ -33,70 +37,125 @@
         background: white;
         border: none;
         border-radius: 50%;
-        width: 50px;
-        height: 50px;
+        width: 60px;
+        height: 60px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
+        font-size: 24px;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      .btn:active {
+        background: #f1f1f1;
+        transform: scale(0.95);
       }
       .instructions {
         position: fixed;
-        top: 20px;
+        top: 40px;
         left: 0;
         right: 0;
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(0, 0, 0, 0.7);
         color: white;
-        padding: 10px;
+        padding: 15px;
         text-align: center;
         z-index: 10;
         transition: opacity 0.5s;
+        font-weight: 500;
+        border-radius: 10px;
+        margin: 0 20px;
+      }
+      .start-button {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #007AFF;
+        color: white;
+        font-size: 18px;
+        font-weight: bold;
+        padding: 16px 30px;
+        border-radius: 30px;
+        border: none;
+        z-index: 100;
       }
       .hidden {
-        opacity: 0;
+        display: none;
+      }
+      .loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        z-index: 1000;
+      }
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #007AFF;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
       }
     </style>
   </head>
   <body>
-    <div id="instructions" class="instructions">
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Loading AR Experience...</p>
+    </div>
+
+    <button id="start-button" class="start-button">
+      Tap to Start AR
+    </button>
+
+    <div id="instructions" class="instructions hidden">
       Point your camera at a flat surface and tap to place your 3D logo
     </div>
 
+    <!-- A-Frame Scene - Initially hidden -->
     <a-scene 
+      id="scene"
+      class="hidden"
       embedded
-      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix;"
-      renderer="logarithmicDepthBuffer: true;"
-      vr-mode-ui="enabled: false">
+      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; trackingMethod: best; sourceWidth: 1280; sourceHeight: 960;"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+      renderer="antialias: true; alpha: true; precision: mediump;">
       
-      <!-- Default camera position -->
-      <a-entity camera></a-entity>
+      <!-- Camera with gesture control -->
+      <a-entity camera position="0 1.6 0" look-controls="touchEnabled: false"></a-entity>
       
-      <!-- This marker is for development and testing -->
-      <a-marker preset="hiro" id="marker">
-        <a-entity
-          id="logo-model"
-          position="0 0.5 0"
-          rotation="0 0 0"
-          scale="1 1 1"
-          gltf-model="your-logo.glb">
-        </a-entity>
-      </a-marker>
-      
-      <!-- Here's where we'll place the logo when the user taps -->
-      <a-entity id="tap-placed-object" visible="false">
+      <!-- Location for placing the 3D model -->
+      <a-entity
+        id="placed-model-wrapper"
+        visible="false"
+        position="0 0 -2">
         <a-entity
           id="placed-logo"
-          position="0 0 0"
           rotation="0 0 0"
-          scale="1 1 1"
-          gltf-model="ImageToStl.com_cloudeyeverse+black+logo.glb">
+          scale="1 1 1">
+          <!-- This will be set in JavaScript -->
         </a-entity>
       </a-entity>
     </a-scene>
 
     <div class="ui-container">
-      <div class="controls">
+      <div id="controls" class="controls hidden">
         <button id="rotateLeft" class="btn">↺</button>
         <button id="scaleDown" class="btn">-</button>
         <button id="scaleUp" class="btn">+</button>
@@ -105,58 +164,101 @@
     </div>
 
     <script>
-      // Wait for the scene to load
       document.addEventListener('DOMContentLoaded', function() {
-        const scene = document.querySelector('a-scene');
-        const logoModel = document.querySelector('#logo-model');
-        const tapPlacedObject = document.querySelector('#tap-placed-object');
-        const placedLogo = document.querySelector('#placed-logo');
-        const instructions = document.querySelector('#instructions');
-        const rotateLeftBtn = document.querySelector('#rotateLeft');
-        const rotateRightBtn = document.querySelector('#rotateRight');
-        const scaleUpBtn = document.querySelector('#scaleUp');
-        const scaleDownBtn = document.querySelector('#scaleDown');
+        // Elements
+        const startButton = document.getElementById('start-button');
+        const loadingScreen = document.getElementById('loading');
+        const scene = document.getElementById('scene');
+        const instructions = document.getElementById('instructions');
+        const controls = document.getElementById('controls');
+        const placedModelWrapper = document.getElementById('placed-model-wrapper');
+        const placedLogo = document.getElementById('placed-logo');
+        const rotateLeftBtn = document.getElementById('rotateLeft');
+        const rotateRightBtn = document.getElementById('rotateRight');
+        const scaleUpBtn = document.getElementById('scaleUp');
+        const scaleDownBtn = document.getElementById('scaleDown');
         
+        // State variables
         let isPlaced = false;
         let currentRotation = 0;
         let currentScale = 1;
-        
-        // Hide instructions after 5 seconds
-        setTimeout(() => {
-          instructions.classList.add('hidden');
-        }, 5000);
+        let modelLoaded = false;
 
-        // Place object on tap
+        // Hide loading when everything is ready
+        window.addEventListener('load', function() {
+          loadingScreen.classList.add('hidden');
+        });
+        
+        // Start AR experience
+        startButton.addEventListener('click', function() {
+          startButton.classList.add('hidden');
+          scene.classList.remove('hidden');
+          instructions.classList.remove('hidden');
+          
+          // Create and add the 3D model element
+          if (!modelLoaded) {
+            loadModel();
+          }
+        });
+
+        // Function to load the 3D model
+        function loadModel() {
+          // Create the entity for the model
+          const logoModel = document.createElement('a-entity');
+          logoModel.setAttribute('gltf-model', 'ImageToStl.com_cloudeyeverse+black+logo.glb'); // Replace with your actual model filename
+          logoModel.setAttribute('position', '0 0 0');
+          logoModel.setAttribute('rotation', '0 0 0');
+          logoModel.setAttribute('scale', '1 1 1');
+          
+          // Add the model to the scene
+          placedLogo.appendChild(logoModel);
+          modelLoaded = true;
+          
+          // Add event listener for model loading errors
+          logoModel.addEventListener('model-error', function(e) {
+            console.error('Error loading model:', e.detail);
+            alert('Error loading 3D model. Please check the file path and try again.');
+          });
+        }
+        
+        // Handle tap to place
         scene.addEventListener('click', function(event) {
           if (!isPlaced) {
-            // Get the camera position and direction
-            const camera = document.querySelector('[camera]');
-            const position = camera.getAttribute('position');
-            const direction = new THREE.Vector3(0, 0, -1);
-            direction.applyQuaternion(camera.object3D.quaternion);
-            
-            // Create a position 2 meters in front of the camera
-            const targetPosition = new THREE.Vector3(
-              position.x + direction.x * 2,
-              position.y - 0.5, // Slightly below camera height to appear on ground
-              position.z + direction.z * 2
-            );
-            
-            // Position the entity
-            tapPlacedObject.setAttribute('position', targetPosition);
-            tapPlacedObject.setAttribute('visible', true);
-            
+            placedModelWrapper.setAttribute('visible', true);
+            controls.classList.remove('hidden');
+            instructions.classList.add('hidden');
             isPlaced = true;
-            instructions.innerHTML = "Use controls to adjust your logo";
-            
-            // Hide the instructions after 3 seconds
-            setTimeout(() => {
-              instructions.classList.add('hidden');
-            }, 3000);
           }
         });
         
-        // Control buttons
+        // Handle rotation and scaling with touch-optimized code
+        rotateLeftBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          currentRotation -= 15;
+          placedLogo.setAttribute('rotation', `0 ${currentRotation} 0`);
+        });
+        
+        rotateRightBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          currentRotation += 15;
+          placedLogo.setAttribute('rotation', `0 ${currentRotation} 0`);
+        });
+        
+        scaleUpBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          currentScale += 0.1;
+          placedLogo.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+        });
+        
+        scaleDownBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          if (currentScale > 0.2) {
+            currentScale -= 0.1;
+            placedLogo.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+          }
+        });
+        
+        // Also handle normal clicks for testing on desktop
         rotateLeftBtn.addEventListener('click', function() {
           currentRotation -= 15;
           placedLogo.setAttribute('rotation', `0 ${currentRotation} 0`);
