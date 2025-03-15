@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Logo Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ar.js/2.4.0/aframe-ar.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+      }
+      .ui-container {
+        position: fixed;
+        bottom: 20px;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 10;
+      }
+      .controls {
+        background: rgba(0, 0, 0, 0.5);
+        padding: 10px 20px;
+        border-radius: 20px;
+        display: flex;
+        gap: 15px;
+        pointer-events: auto;
+      }
+      .btn {
+        background: white;
+        border: none;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      }
+      .instructions {
+        position: fixed;
+        top: 20px;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        padding: 10px;
+        text-align: center;
+        z-index: 10;
+        transition: opacity 0.5s;
+      }
+      .hidden {
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="instructions" class="instructions">
+      Point your camera at a flat surface and tap to place your 3D logo
+    </div>
+
+    <a-scene 
+      embedded
+      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix;"
+      renderer="logarithmicDepthBuffer: true;"
+      vr-mode-ui="enabled: false">
+      
+      <!-- Default camera position -->
+      <a-entity camera></a-entity>
+      
+      <!-- This marker is for development and testing -->
+      <a-marker preset="hiro" id="marker">
+        <a-entity
+          id="logo-model"
+          position="0 0.5 0"
+          rotation="0 0 0"
+          scale="1 1 1"
+          gltf-model="your-logo.glb">
+        </a-entity>
+      </a-marker>
+      
+      <!-- Here's where we'll place the logo when the user taps -->
+      <a-entity id="tap-placed-object" visible="false">
+        <a-entity
+          id="placed-logo"
+          position="0 0 0"
+          rotation="0 0 0"
+          scale="1 1 1"
+          gltf-model="your-logo.glb">
+        </a-entity>
+      </a-entity>
+    </a-scene>
+
+    <div class="ui-container">
+      <div class="controls">
+        <button id="rotateLeft" class="btn">↺</button>
+        <button id="scaleDown" class="btn">-</button>
+        <button id="scaleUp" class="btn">+</button>
+        <button id="rotateRight" class="btn">↻</button>
+      </div>
+    </div>
+
+    <script>
+      // Wait for the scene to load
+      document.addEventListener('DOMContentLoaded', function() {
+        const scene = document.querySelector('a-scene');
+        const logoModel = document.querySelector('#logo-model');
+        const tapPlacedObject = document.querySelector('#tap-placed-object');
+        const placedLogo = document.querySelector('#placed-logo');
+        const instructions = document.querySelector('#instructions');
+        const rotateLeftBtn = document.querySelector('#rotateLeft');
+        const rotateRightBtn = document.querySelector('#rotateRight');
+        const scaleUpBtn = document.querySelector('#scaleUp');
+        const scaleDownBtn = document.querySelector('#scaleDown');
+        
+        let isPlaced = false;
+        let currentRotation = 0;
+        let currentScale = 1;
+        
+        // Hide instructions after 5 seconds
+        setTimeout(() => {
+          instructions.classList.add('hidden');
+        }, 5000);
+
+        // Place object on tap
+        scene.addEventListener('click', function(event) {
+          if (!isPlaced) {
+            // Get the camera position and direction
+            const camera = document.querySelector('[camera]');
+            const position = camera.getAttribute('position');
+            const direction = new THREE.Vector3(0, 0, -1);
+            direction.applyQuaternion(camera.object3D.quaternion);
+            
+            // Create a position 2 meters in front of the camera
+            const targetPosition = new THREE.Vector3(
+              position.x + direction.x * 2,
+              position.y - 0.5, // Slightly below camera height to appear on ground
+              position.z + direction.z * 2
+            );
+            
+            // Position the entity
+            tapPlacedObject.setAttribute('position', targetPosition);
+            tapPlacedObject.setAttribute('visible', true);
+            
+            isPlaced = true;
+            instructions.innerHTML = "Use controls to adjust your logo";
+            
+            // Hide the instructions after 3 seconds
+            setTimeout(() => {
+              instructions.classList.add('hidden');
+            }, 3000);
+          }
+        });
+        
+        // Control buttons
+        rotateLeftBtn.addEventListener('click', function() {
+          currentRotation -= 15;
+          placedLogo.setAttribute('rotation', `0 ${currentRotation} 0`);
+        });
+        
+        rotateRightBtn.addEventListener('click', function() {
+          currentRotation += 15;
+          placedLogo.setAttribute('rotation', `0 ${currentRotation} 0`);
+        });
+        
+        scaleUpBtn.addEventListener('click', function() {
+          currentScale += 0.1;
+          placedLogo.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+        });
+        
+        scaleDownBtn.addEventListener('click', function() {
+          if (currentScale > 0.2) {
+            currentScale -= 0.1;
+            placedLogo.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
