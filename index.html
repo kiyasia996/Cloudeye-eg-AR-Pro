@@ -4,15 +4,16 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Simple AR Logo Viewer - iOS Fixed</title>
-    <!-- Use specific versions known to work well on iOS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.3.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.3.1/aframe/build/aframe-ar.js"></script>
+    <title>AR Logo Viewer - iOS Compatible</title>
+    <!-- Using updated CDN links for better compatibility -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
       body {
         margin: 0;
         overflow: hidden;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        -webkit-tap-highlight-color: transparent;
       }
       .ui-container {
         position: fixed;
@@ -20,6 +21,7 @@
         width: 100%;
         display: flex;
         justify-content: center;
+        pointer-events: none;
         z-index: 10;
       }
       .controls {
@@ -28,40 +30,47 @@
         border-radius: 30px;
         display: flex;
         gap: 15px;
+        pointer-events: auto;
       }
       .btn {
         background: white;
         border: none;
         border-radius: 50%;
-        width: 50px;
-        height: 50px;
+        width: 60px;
+        height: 60px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
+        font-size: 24px;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
       }
       .btn:active {
         background: #f1f1f1;
         transform: scale(0.95);
       }
-      .hidden {
-        display: none;
-      }
-      .start-screen {
+      .instructions {
         position: fixed;
-        top: 0;
+        top: 40px;
         left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 999;
+        right: 0;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 15px;
+        text-align: center;
+        z-index: 10;
+        transition: opacity 0.5s;
+        font-weight: 500;
+        border-radius: 10px;
+        margin: 0 20px;
       }
       .start-button {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
         background: #007AFF;
         color: white;
         font-size: 18px;
@@ -69,195 +78,336 @@
         padding: 16px 30px;
         border-radius: 30px;
         border: none;
-        margin-top: 20px;
+        z-index: 100;
       }
-      .status-text {
-        color: white;
-        margin-top: 20px;
-        text-align: center;
-        padding: 0 20px;
+      .hidden {
+        display: none;
       }
-      #model-status {
+      .loading {
         position: fixed;
-        bottom: 120px;
+        top: 0;
         left: 0;
         width: 100%;
-        text-align: center;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
         color: white;
-        background: rgba(0, 0, 0, 0.5);
-        padding: 5px;
-        font-size: 12px;
-        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        z-index: 1000;
+      }
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #007AFF;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .status-message {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        padding: 10px 15px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border-radius: 5px;
+        font-size: 14px;
+        z-index: 20;
+      }
+      .error-message {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 0, 0, 0.8);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        z-index: 1001;
       }
     </style>
   </head>
   <body>
-    <div id="start-screen" class="start-screen">
-      <h2 style="color: white;">AR Logo Viewer</h2>
-      <p class="status-text">Experience your 3D logo in augmented reality</p>
-      <button id="start-button" class="start-button">Start AR Experience</button>
-      <p id="loading-status" class="status-text">Initializing...</p>
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Loading AR Experience...</p>
     </div>
 
-    <div id="model-status" class="hidden">Model Status: Loading...</div>
+    <button id="start-button" class="start-button">
+      Tap to Start AR
+    </button>
 
-    <!-- A-Frame Scene -->
+    <div id="instructions" class="instructions hidden">
+      Point your camera at a flat surface and tap to place your 3D logo
+    </div>
+
+    <div id="status-message" class="status-message hidden"></div>
+    <div id="error-message" class="error-message hidden"></div>
+
+    <!-- A-Frame Scene - hidden initially -->
     <a-scene 
+      id="scene"
+      class="hidden"
       embedded
-      arjs="sourceType: webcam; debugUIEnabled: false;"
+      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best;"
+      renderer="logarithmicDepthBuffer: true; antialias: true; alpha: true; precision: mediump;"
       vr-mode-ui="enabled: false"
-      renderer="logarithmicDepthBuffer: true;"
-      id="ar-scene"
-      class="hidden">
+      device-orientation-permission-ui="enabled: false">
       
-      <!-- Camera with cursor for interaction -->
-      <a-entity camera position="0 1.6 0" look-controls="enabled: false">
-        <a-entity cursor="fuse: false;" raycaster="objects: .clickable;"></a-entity>
+      <!-- Camera -->
+      <a-entity camera></a-entity>
+      
+      <!-- Marker - Using a simple marker type for better compatibility -->
+      <a-marker preset="hiro" id="marker">
+        <a-entity
+          id="logo-model"
+          position="0 0 0"
+          rotation="0 0 0"
+          scale="1 1 1">
+          <!-- Will be replaced with a primitive or model -->
+        </a-entity>
+      </a-marker>
+      
+      <!-- Fallback if marker isn't detected -->
+      <a-entity
+        id="placed-model-wrapper"
+        visible="false"
+        position="0 0 -2">
+        <a-entity
+          id="placed-logo"
+          rotation="0 0 0"
+          scale="1 1 1">
+          <!-- Will be replaced with a primitive or model -->
+        </a-entity>
       </a-entity>
-      
-      <!-- Container for the model -->
-      <a-entity id="model-container" position="0 0 -3" class="clickable" visible="false"></a-entity>
     </a-scene>
 
     <div class="ui-container">
       <div id="controls" class="controls hidden">
-        <button id="rotate-left" class="btn">↺</button>
-        <button id="scale-down" class="btn">-</button>
-        <button id="scale-up" class="btn">+</button>
-        <button id="rotate-right" class="btn">↻</button>
+        <button id="rotateLeft" class="btn">↺</button>
+        <button id="scaleDown" class="btn">-</button>
+        <button id="scaleUp" class="btn">+</button>
+        <button id="rotateRight" class="btn">↻</button>
       </div>
     </div>
 
     <script>
-      window.addEventListener('DOMContentLoaded', () => {
+      document.addEventListener('DOMContentLoaded', function() {
         // Elements
-        const startScreen = document.getElementById('start-screen');
         const startButton = document.getElementById('start-button');
-        const loadingStatus = document.getElementById('loading-status');
-        const arScene = document.getElementById('ar-scene');
-        const modelContainer = document.getElementById('model-container'); 
+        const loadingScreen = document.getElementById('loading');
+        const scene = document.getElementById('scene');
+        const instructions = document.getElementById('instructions');
         const controls = document.getElementById('controls');
-        const modelStatus = document.getElementById('model-status');
-        
-        // Control buttons
-        const rotateLeft = document.getElementById('rotate-left');
-        const rotateRight = document.getElementById('rotate-right');
-        const scaleUp = document.getElementById('scale-up');
-        const scaleDown = document.getElementById('scale-down');
+        const placedModelWrapper = document.getElementById('placed-model-wrapper');
+        const placedLogo = document.getElementById('placed-logo');
+        const logoModel = document.getElementById('logo-model');
+        const marker = document.getElementById('marker');
+        const rotateLeftBtn = document.getElementById('rotateLeft');
+        const rotateRightBtn = document.getElementById('rotateRight');
+        const scaleUpBtn = document.getElementById('scaleUp');
+        const scaleDownBtn = document.getElementById('scaleDown');
+        const statusMessage = document.getElementById('status-message');
+        const errorMessage = document.getElementById('error-message');
         
         // State variables
-        let isModelPlaced = false;
+        let isPlaced = false;
         let currentRotation = 0;
         let currentScale = 1;
-        
-        // Check for iOS
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        
-        // Start button click handler
-        startButton.addEventListener('click', () => {
-          loadingStatus.textContent = "Loading AR experience...";
-          startButton.style.display = 'none';
-          
-          // Show the AR scene
-          arScene.classList.remove('hidden');
-          
+        let modelLoaded = false;
+        let usingFallback = false;
+
+        // Show status message
+        function showStatus(message, duration = 3000) {
+          statusMessage.textContent = message;
+          statusMessage.classList.remove('hidden');
           setTimeout(() => {
-            try {
-              // Load model after a short delay
-              loadModel();
-              loadingStatus.textContent = "AR ready! Looking for surfaces...";
-              
-              // Hide start screen after a short delay
-              setTimeout(() => {
-                startScreen.style.display = 'none';
-                modelStatus.classList.remove('hidden');
-              }, 1000);
-            } catch (error) {
-              loadingStatus.textContent = "Error: " + error.message;
-              console.error("AR initialization error:", error);
-            }
-          }, 500);
+            statusMessage.classList.add('hidden');
+          }, duration);
+        }
+
+        // Show error message
+        function showError(message) {
+          errorMessage.textContent = message;
+          errorMessage.classList.remove('hidden');
+          setTimeout(() => {
+            errorMessage.classList.add('hidden');
+          }, 5000);
+        }
+
+        // Check if AR is supported
+        if (!navigator.xr && !window.WebXRPolyfill) {
+          showError("WebXR not supported on this device. Please try on a modern smartphone.");
+        }
+
+        // Hide loading when everything is ready
+        window.addEventListener('load', function() {
+          setTimeout(() => {
+            loadingScreen.classList.add('hidden');
+          }, 1000);
         });
         
-        // Handle model loading
+        // Start AR experience
+        startButton.addEventListener('click', function() {
+          startButton.classList.add('hidden');
+          scene.classList.remove('hidden');
+          instructions.classList.remove('hidden');
+          
+          // Create and add the 3D model element
+          if (!modelLoaded) {
+            loadModel();
+          }
+
+          // Camera permission handling
+          navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function(stream) {
+              stream.getTracks().forEach(track => track.stop());
+              showStatus("Camera access granted!");
+            })
+            .catch(function(err) {
+              showError("Camera permission denied. Please allow camera access.");
+              console.error("Camera error:", err);
+            });
+        });
+
+        // Function to load the 3D model
         function loadModel() {
-          modelStatus.textContent = "Model Status: Loading model...";
-          
-          // Create new entity for the model
-          const modelEntity = document.createElement('a-entity');
-          modelEntity.setAttribute('id', 'logo-model');
-          modelEntity.setAttribute('position', '0 0 0');
-          modelEntity.setAttribute('rotation', '0 0 0');
-          modelEntity.setAttribute('scale', '1 1 1');
-          
-          // Use direct path to model - adjust this path to your actual file location
-          // Make sure the file is in the root of your GitHub Pages repo
-          modelEntity.setAttribute('gltf-model', 'logo.glb');
-          
-          // Add model to container
-          modelContainer.appendChild(modelEntity);
-          
-          // Listen for model loaded event
-          modelEntity.addEventListener('model-loaded', () => {
-            modelStatus.textContent = "Model Status: Loaded! Tap to place.";
-            console.log("Model loaded successfully");
+          try {
+            // Use a simple cube as a fallback
+            const cube = document.createElement('a-box');
+            cube.setAttribute('color', '#007AFF');
+            cube.setAttribute('position', '0 0.5 0');
+            cube.setAttribute('rotation', '0 0 0');
+            cube.setAttribute('scale', '1 1 1');
             
-            // Make model container visible
-            modelContainer.setAttribute('visible', true);
+            // Add the cube to both the marker and placed model locations
+            logoModel.appendChild(cube.cloneNode(true));
+            placedLogo.appendChild(cube.cloneNode(true));
             
-            // Set up tap handler for placement
-            setupTapHandler();
-          });
-          
-          // Listen for model error event
-          modelEntity.addEventListener('model-error', (error) => {
-            modelStatus.textContent = "Model Status: Error loading model!";
-            console.error("Error loading model:", error);
-          });
+            modelLoaded = true;
+            showStatus("Using a simple cube as placeholder");
+            
+            // Try to load the actual model
+            const actualModel = document.createElement('a-entity');
+            // Update this URL to point to your actual model file
+            actualModel.setAttribute('gltf-model', 'url(https://github.com/kiyasia996/Cloudeye-eg-AR-Pro/blob/main/logo.glb)');
+            actualModel.setAttribute('position', '0 0 0');
+            actualModel.setAttribute('rotation', '0 0 0');
+            actualModel.setAttribute('scale', '1 1 1');
+            
+            actualModel.addEventListener('model-loaded', function() {
+              // Replace the cube with the actual model
+              logoModel.innerHTML = '';
+              placedLogo.innerHTML = '';
+              logoModel.appendChild(actualModel.cloneNode(true));
+              placedLogo.appendChild(actualModel.cloneNode(true));
+              showStatus("3D model loaded successfully!");
+            });
+            
+            actualModel.addEventListener('model-error', function(e) {
+              console.error('Error loading model:', e.detail);
+              showStatus("Using fallback cube - model failed to load");
+            });
+            
+            // Add the model to the scene to attempt loading
+            const hiddenLoader = document.createElement('a-entity');
+            hiddenLoader.style.display = 'none';
+            hiddenLoader.appendChild(actualModel);
+            scene.appendChild(hiddenLoader);
+          } catch (error) {
+            console.error("Error setting up model:", error);
+            showError("Failed to set up 3D model. Using fallback.");
+          }
         }
-        
-        // Set up tap handler for model placement
-        function setupTapHandler() {
-          // Use touch for mobile, click for desktop
-          const eventType = 'ontouchstart' in window ? 'touchend' : 'click';
-          
-          document.body.addEventListener(eventType, (event) => {
-            if (!isModelPlaced) {
-              modelStatus.textContent = "Model placed! Use controls to adjust.";
-              controls.classList.remove('hidden');
-              isModelPlaced = true;
-              
-              // Hide status after a few seconds
-              setTimeout(() => {
-                modelStatus.classList.add('hidden');
-              }, 3000);
-            }
-          }, { once: false });
-        }
-        
-        // Control handlers
-        rotateLeft.addEventListener('click', () => {
-          currentRotation -= 15;
-          document.getElementById('logo-model').setAttribute('rotation', `0 ${currentRotation} 0`);
+
+        // Handle marker detection
+        marker.addEventListener('markerFound', function() {
+          showStatus("Marker detected!");
+          controls.classList.remove('hidden');
+          instructions.classList.add('hidden');
+        });
+
+        marker.addEventListener('markerLost', function() {
+          showStatus("Marker lost. Find the marker again.");
         });
         
-        rotateRight.addEventListener('click', () => {
-          currentRotation += 15;
-          document.getElementById('logo-model').setAttribute('rotation', `0 ${currentRotation} 0`);
-        });
-        
-        scaleUp.addEventListener('click', () => {
-          currentScale += 0.1;
-          document.getElementById('logo-model').setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
-        });
-        
-        scaleDown.addEventListener('click', () => {
-          if (currentScale > 0.2) {
-            currentScale -= 0.1;
-            document.getElementById('logo-model').setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+        // Handle tap to place (fallback if marker isn't used)
+        scene.addEventListener('click', function(event) {
+          if (!isPlaced && !marker.object3D.visible) {
+            usingFallback = true;
+            placedModelWrapper.setAttribute('visible', true);
+            controls.classList.remove('hidden');
+            instructions.classList.add('hidden');
+            isPlaced = true;
+            showStatus("Model placed!");
           }
         });
-      });
-    </script>
-  </body>
-</html>
+        
+        // Handle rotation and scaling
+        function updateModelTransform() {
+          if (usingFallback) {
+            placedLogo.setAttribute('rotation', `0 ${currentRotation} 0`);
+            placedLogo.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+          } else {
+            logoModel.setAttribute('rotation', `0 ${currentRotation} 0`);
+            logoModel.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+          }
+        }
+        
+        // Touch events for mobile
+        rotateLeftBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          currentRotation -= 15;
+          updateModelTransform();
+        });
+        
+        rotateRightBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          currentRotation += 15;
+          updateModelTransform();
+        });
+        
+        scaleUpBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          currentScale += 0.1;
+          updateModelTransform();
+        });
+        
+        scaleDownBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          if (currentScale > 0.2) {
+            currentScale -= 0.1;
+            updateModelTransform();
+          }
+        });
+        
+        // Mouse events for desktop testing
+        rotateLeftBtn.addEventListener('click', function() {
+          currentRotation -= 15;
+          updateModelTransform();
+        });
+        
+        rotateRightBtn.addEventListener('click', function() {
+          currentRotation += 15;
+          updateModelTransform();
+        });
+        
+        scaleUpBtn.addEventListener('click', function() {
+          currentScale += 0.1;
+          updateModelTransform();
+        });
+        
+        scaleDownBtn.addEventListener('click', function() {
+          if (currentScale > 0.2) {
+            currentScale -= 0.1;
+            updateModelTransform();
+          }
+        });
